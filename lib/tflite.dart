@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_import
+
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' show Color;
@@ -164,7 +166,8 @@ class Tflite {
     double imageStd = 127.5,
     double threshold = 0.1,
     int numResultsPerClass = 5,
-    int rotation: 90, // Android only
+    int rotation = 90, // Android only
+
     // Used in YOLO only
     List anchors = anchors,
     int blockSize = 32,
@@ -233,7 +236,7 @@ class Tflite {
     int imageWidth = 720,
     double imageMean = 0,
     double imageStd = 255.0,
-    int rotation: 90, // Android only
+    int rotation = 90, // Android only
     String outputType = "png",
     bool asynch = true,
   }) async {
@@ -319,7 +322,7 @@ class Tflite {
       int imageWidth = 720,
       double imageMean = 0,
       double imageStd = 255.0,
-      int rotation: 90, // Android only
+      int rotation = 90, // Android only
       List<int>? labelColors,
       String outputType = "png",
       bool asynch = true}) async {
@@ -385,7 +388,7 @@ class Tflite {
       int imageWidth = 720,
       double imageMean = 127.5,
       double imageStd = 127.5,
-      int rotation: 90, // Android only
+      int rotation = 90, // Android only
       int numResults = 5,
       double threshold = 0.5,
       int nmsRadius = 20,
