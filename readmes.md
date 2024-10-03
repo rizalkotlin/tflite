@@ -1,6 +1,5 @@
 package sq.flutter.tflite;
 
-import android.app.Activity;
 import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
@@ -20,20 +19,11 @@ import android.renderscript.ScriptIntrinsicYuvToRGB;
 import android.renderscript.Type;
 import android.util.Log;
 
-import androidx.annotation.NonNull;
-
-import io.flutter.FlutterInjector;
-import io.flutter.embedding.android.FlutterActivity;
-import io.flutter.embedding.engine.loader.FlutterLoader;
-import io.flutter.embedding.engine.plugins.activity.ActivityAware;
-import io.flutter.embedding.engine.plugins.FlutterPlugin;
-import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
-import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
-import io.flutter.plugin.common.PluginRegistry;
+import io.flutter.plugin.common.PluginRegistry.Registrar;
 
 import org.tensorflow.lite.DataType;
 import org.tensorflow.lite.Interpreter;
@@ -62,8 +52,8 @@ import java.util.PriorityQueue;
 import java.util.Vector;
 
 
-public class TflitePlugin implements FlutterPlugin, MethodCallHandler, ActivityAware {
-  private Activity activity;
+public class TflitePlugin implements MethodCallHandler {
+  private final Registrar mRegistrar;
   private Interpreter tfLite;
   private boolean tfLiteBusy = false;
   private int inputSize = 0;
@@ -72,61 +62,37 @@ public class TflitePlugin implements FlutterPlugin, MethodCallHandler, ActivityA
   private static final int BYTES_PER_CHANNEL = 4;
 
   String[] partNames = {
-          "nose", "leftEye", "rightEye", "leftEar", "rightEar", "leftShoulder",
-          "rightShoulder", "leftElbow", "rightElbow", "leftWrist", "rightWrist",
-          "leftHip", "rightHip", "leftKnee", "rightKnee", "leftAnkle", "rightAnkle"
+      "nose", "leftEye", "rightEye", "leftEar", "rightEar", "leftShoulder",
+      "rightShoulder", "leftElbow", "rightElbow", "leftWrist", "rightWrist",
+      "leftHip", "rightHip", "leftKnee", "rightKnee", "leftAnkle", "rightAnkle"
   };
 
   String[][] poseChain = {
-          {"nose", "leftEye"}, {"leftEye", "leftEar"}, {"nose", "rightEye"},
-          {"rightEye", "rightEar"}, {"nose", "leftShoulder"},
-          {"leftShoulder", "leftElbow"}, {"leftElbow", "leftWrist"},
-          {"leftShoulder", "leftHip"}, {"leftHip", "leftKnee"},
-          {"leftKnee", "leftAnkle"}, {"nose", "rightShoulder"},
-          {"rightShoulder", "rightElbow"}, {"rightElbow", "rightWrist"},
-          {"rightShoulder", "rightHip"}, {"rightHip", "rightKnee"},
-          {"rightKnee", "rightAnkle"}
+      {"nose", "leftEye"}, {"leftEye", "leftEar"}, {"nose", "rightEye"},
+      {"rightEye", "rightEar"}, {"nose", "leftShoulder"},
+      {"leftShoulder", "leftElbow"}, {"leftElbow", "leftWrist"},
+      {"leftShoulder", "leftHip"}, {"leftHip", "leftKnee"},
+      {"leftKnee", "leftAnkle"}, {"nose", "rightShoulder"},
+      {"rightShoulder", "rightElbow"}, {"rightElbow", "rightWrist"},
+      {"rightShoulder", "rightHip"}, {"rightHip", "rightKnee"},
+      {"rightKnee", "rightAnkle"}
   };
 
   Map<String, Integer> partsIds = new HashMap<>();
   List<Integer> parentToChildEdges = new ArrayList<>();
   List<Integer> childToParentEdges = new ArrayList<>();
 
-  private MethodChannel channel;
+  public static void registerWith(Registrar registrar) {
+    final MethodChannel channel = new MethodChannel(registrar.messenger(), "tflite");
+    channel.setMethodCallHandler(new TflitePlugin(registrar));
+  }
 
-  @Override
-  public void onAttachedToEngine(@NonNull FlutterPluginBinding flutterPluginBinding) {
-    channel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), "tflite");
-    channel.setMethodCallHandler(this);
+  private TflitePlugin(Registrar registrar) {
+    this.mRegistrar = registrar;
   }
 
   @Override
-  public void onAttachedToActivity(@NonNull ActivityPluginBinding binding) {
-    activity = binding.getActivity();
-  }
-
-  @Override
-  public void onDetachedFromActivity() {
-    activity = null;
-  }
-
-  @Override
-  public void onDetachedFromActivityForConfigChanges() {
-    this.onDetachedFromActivity();
-  }
-
-  @Override
-  public void onReattachedToActivityForConfigChanges(@NonNull ActivityPluginBinding binding) {
-    this.onAttachedToActivity(binding);
-  }
-
-  @Override
-  public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
-    channel.setMethodCallHandler(null);
-  }
-
-  @Override
-  public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
+  public void onMethodCall(MethodCall call, Result result) {
     if (call.method.equals("loadModel")) {
       try {
         String res = loadModel((HashMap) call.arguments);
@@ -239,9 +205,8 @@ public class TflitePlugin implements FlutterPlugin, MethodCallHandler, ActivityA
     String key = null;
     AssetManager assetManager = null;
     if (isAsset) {
-      assetManager = activity.getApplicationContext().getAssets();
-      FlutterLoader loader = FlutterInjector.instance().flutterLoader();
-      key = loader.getLookupKeyForAsset(model);
+      assetManager = mRegistrar.context().getAssets();
+      key = mRegistrar.lookupKeyForAsset(model);
       AssetFileDescriptor fileDescriptor = assetManager.openFd(key);
       FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
       FileChannel fileChannel = inputStream.getChannel();
@@ -273,8 +238,7 @@ public class TflitePlugin implements FlutterPlugin, MethodCallHandler, ActivityA
 
     if (labels.length() > 0) {
       if (isAsset) {
-        FlutterLoader loader = FlutterInjector.instance().flutterLoader();
-        key = loader.getLookupKeyForAsset(labels);
+        key = mRegistrar.lookupKeyForAsset(labels);
         loadLabels(assetManager, key);
       } else {
         loadLabels(null, labels);
@@ -306,14 +270,14 @@ public class TflitePlugin implements FlutterPlugin, MethodCallHandler, ActivityA
 
   private List<Map<String, Object>> GetTopN(int numResults, float threshold) {
     PriorityQueue<Map<String, Object>> pq =
-            new PriorityQueue<>(
-                    1,
-                    new Comparator<Map<String, Object>>() {
-                      @Override
-                      public int compare(Map<String, Object> lhs, Map<String, Object> rhs) {
-                        return Float.compare((float) rhs.get("confidence"), (float) lhs.get("confidence"));
-                      }
-                    });
+        new PriorityQueue<>(
+            1,
+            new Comparator<Map<String, Object>>() {
+              @Override
+              public int compare(Map<String, Object> lhs, Map<String, Object> rhs) {
+                return Float.compare((float) rhs.get("confidence"), (float) lhs.get("confidence"));
+              }
+            });
 
     for (int i = 0; i < labels.size(); ++i) {
       float confidence = labelProb[0][i];
@@ -377,7 +341,7 @@ public class TflitePlugin implements FlutterPlugin, MethodCallHandler, ActivityA
     Bitmap bitmap = bitmapRaw;
     if (bitmapRaw.getWidth() != inputSize || bitmapRaw.getHeight() != inputSize) {
       Matrix matrix = getTransformationMatrix(bitmapRaw.getWidth(), bitmapRaw.getHeight(),
-              inputSize, inputSize, false);
+          inputSize, inputSize, false);
       bitmap = Bitmap.createBitmap(inputSize, inputSize, Bitmap.Config.ARGB_8888);
       final Canvas canvas = new Canvas(bitmap);
       if (inputChannels == 1){
@@ -447,10 +411,10 @@ public class TflitePlugin implements FlutterPlugin, MethodCallHandler, ActivityA
 
     Bitmap bitmapRaw = Bitmap.createBitmap(imageWidth, imageHeight, Bitmap.Config.ARGB_8888);
     Allocation bmData = renderScriptNV21ToRGBA888(
-            activity.getApplicationContext(),
-            imageWidth,
-            imageHeight,
-            data);
+        mRegistrar.context(),
+        imageWidth,
+        imageHeight,
+        data);
     bmData.copyTo(bitmapRaw);
 
     Matrix matrix = new Matrix();
@@ -799,14 +763,14 @@ public class TflitePlugin implements FlutterPlugin, MethodCallHandler, ActivityA
       Log.v("time", "Inference took " + (SystemClock.uptimeMillis() - startTime));
 
       PriorityQueue<Map<String, Object>> pq =
-              new PriorityQueue<>(
-                      1,
-                      new Comparator<Map<String, Object>>() {
-                        @Override
-                        public int compare(Map<String, Object> lhs, Map<String, Object> rhs) {
-                          return Float.compare((float) rhs.get("confidenceInClass"), (float) lhs.get("confidenceInClass"));
-                        }
-                      });
+          new PriorityQueue<>(
+              1,
+              new Comparator<Map<String, Object>>() {
+                @Override
+                public int compare(Map<String, Object> lhs, Map<String, Object> rhs) {
+                  return Float.compare((float) rhs.get("confidenceInClass"), (float) lhs.get("confidenceInClass"));
+                }
+              });
 
       for (int y = 0; y < gridSize; ++y) {
         for (int x = 0; x < gridSize; ++x) {
@@ -1353,7 +1317,7 @@ public class TflitePlugin implements FlutterPlugin, MethodCallHandler, ActivityA
         float[] rootPoint = getImageCoords(root, outputStride, numParts, offsets);
 
         if (withinNmsRadiusOfCorrespondingPoint(
-                results, sqaredNmsRadius, rootPoint[0], rootPoint[1], (int) root.get("partId")))
+            results, sqaredNmsRadius, rootPoint[0], rootPoint[1], (int) root.get("partId")))
           continue;
 
         Map<String, Object> keypoint = new HashMap<>();
@@ -1370,7 +1334,7 @@ public class TflitePlugin implements FlutterPlugin, MethodCallHandler, ActivityA
           int targetKeypointId = childToParentEdges.get(edge);
           if (keypoints.containsKey(sourceKeypointId) && !keypoints.containsKey(targetKeypointId)) {
             keypoint = traverseToTargetKeypoint(edge, keypoints.get(sourceKeypointId),
-                    targetKeypointId, scores, offsets, outputStride, displacementsBwd);
+                targetKeypointId, scores, offsets, outputStride, displacementsBwd);
             keypoints.put(targetKeypointId, keypoint);
           }
         }
@@ -1380,7 +1344,7 @@ public class TflitePlugin implements FlutterPlugin, MethodCallHandler, ActivityA
           int targetKeypointId = parentToChildEdges.get(edge);
           if (keypoints.containsKey(sourceKeypointId) && !keypoints.containsKey(targetKeypointId)) {
             keypoint = traverseToTargetKeypoint(edge, keypoints.get(sourceKeypointId),
-                    targetKeypointId, scores, offsets, outputStride, displacementsFwd);
+                targetKeypointId, scores, offsets, outputStride, displacementsFwd);
             keypoints.put(targetKeypointId, keypoint);
           }
         }
@@ -1399,14 +1363,14 @@ public class TflitePlugin implements FlutterPlugin, MethodCallHandler, ActivityA
                                                              double threshold,
                                                              int localMaximumRadius) {
     PriorityQueue<Map<String, Object>> pq =
-            new PriorityQueue<>(
-                    1,
-                    new Comparator<Map<String, Object>>() {
-                      @Override
-                      public int compare(Map<String, Object> lhs, Map<String, Object> rhs) {
-                        return Float.compare((float) rhs.get("score"), (float) lhs.get("score"));
-                      }
-                    });
+        new PriorityQueue<>(
+            1,
+            new Comparator<Map<String, Object>>() {
+              @Override
+              public int compare(Map<String, Object> lhs, Map<String, Object> rhs) {
+                return Float.compare((float) rhs.get("score"), (float) lhs.get("score"));
+              }
+            });
 
     for (int heatmapY = 0; heatmapY < scores.length; ++heatmapY) {
       for (int heatmapX = 0; heatmapX < scores[0].length; ++heatmapX) {
@@ -1415,7 +1379,7 @@ public class TflitePlugin implements FlutterPlugin, MethodCallHandler, ActivityA
           if (score < threshold) continue;
 
           if (scoreIsMaximumInLocalWindow(
-                  keypointId, score, heatmapY, heatmapX, localMaximumRadius, scores)) {
+              keypointId, score, heatmapY, heatmapX, localMaximumRadius, scores)) {
             Map<String, Object> res = new HashMap<>();
             res.put("score", score);
             res.put("y", heatmapY);
@@ -1507,13 +1471,13 @@ public class TflitePlugin implements FlutterPlugin, MethodCallHandler, ActivityA
     float sourceKeypointX = (float) sourceKeypoint.get("x") * inputSize;
 
     int[] sourceKeypointIndices = getStridedIndexNearPoint(sourceKeypointY, sourceKeypointX,
-            outputStride, height, width);
+        outputStride, height, width);
 
     float[] displacement = getDisplacement(edgeId, sourceKeypointIndices, displacements);
 
     float[] displacedPoint = new float[]{
-            sourceKeypointY + displacement[0],
-            sourceKeypointX + displacement[1]
+        sourceKeypointY + displacement[0],
+        sourceKeypointX + displacement[1]
     };
 
     float[] targetKeypoint = displacedPoint;
@@ -1521,7 +1485,7 @@ public class TflitePlugin implements FlutterPlugin, MethodCallHandler, ActivityA
     final int offsetRefineStep = 2;
     for (int i = 0; i < offsetRefineStep; i++) {
       int[] targetKeypointIndices = getStridedIndexNearPoint(targetKeypoint[0], targetKeypoint[1],
-              outputStride, height, width);
+          outputStride, height, width);
 
       int targetKeypointY = targetKeypointIndices[0];
       int targetKeypointX = targetKeypointIndices[1];
@@ -1530,13 +1494,13 @@ public class TflitePlugin implements FlutterPlugin, MethodCallHandler, ActivityA
       float offsetX = offsets[targetKeypointY][targetKeypointX][targetKeypointId + numKeypoints];
 
       targetKeypoint = new float[]{
-              targetKeypointY * outputStride + offsetY,
-              targetKeypointX * outputStride + offsetX
+          targetKeypointY * outputStride + offsetY,
+          targetKeypointX * outputStride + offsetX
       };
     }
 
     int[] targetKeypointIndices = getStridedIndexNearPoint(targetKeypoint[0], targetKeypoint[1],
-            outputStride, height, width);
+        outputStride, height, width);
 
     float score = sigmoid(scores[targetKeypointIndices[0]][targetKeypointIndices[1]][targetKeypointId]);
 

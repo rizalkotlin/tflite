@@ -5,8 +5,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
+import 'package:tflite/tflite_plugin.dart';
 
-import 'package:tflite/tflite.dart';
 import 'package:image_picker/image_picker.dart';
 
 void main() => runApp(new App());
@@ -32,11 +32,12 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  File _image;
-  List _recognitions;
-  String _model = mobile;
-  double _imageHeight;
-  double _imageWidth;
+  final tflitePlugin = TflitePlugin();
+  File? _image;
+  List? _recognitions;
+  String? _model = mobile;
+  double? _imageHeight;
+  double? _imageWidth;
   bool _busy = false;
 
   Future predictImagePicker() async {
@@ -98,41 +99,45 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future loadModel() async {
-    Tflite.close();
+    // tflitePlugin.close();
     try {
-      String res;
+      String? res;
       switch (_model) {
         case yolo:
-          res = await Tflite.loadModel(
+          res = await tflitePlugin.loadModel(
             model: "assets/yolov2_tiny.tflite",
             labels: "assets/yolov2_tiny.txt",
             // useGpuDelegate: true,
           );
           break;
         case ssd:
-          res = await Tflite.loadModel(
+          res = await tflitePlugin.loadModel(
             model: "assets/ssd_mobilenet.tflite",
             labels: "assets/ssd_mobilenet.txt",
             // useGpuDelegate: true,
           );
           break;
         case deeplab:
-          res = await Tflite.loadModel(
+          res = await tflitePlugin.loadModel(
             model: "assets/deeplabv3_257_mv_gpu.tflite",
             labels: "assets/deeplabv3_257_mv_gpu.txt",
             // useGpuDelegate: true,
           );
           break;
         case posenet:
-          res = await Tflite.loadModel(
+          res = await tflitePlugin.loadModel(
             model: "assets/posenet_mv1_075_float_from_checkpoints.tflite",
             // useGpuDelegate: true,
           );
           break;
         default:
-          res = await Tflite.loadModel(
+          res = await tflitePlugin.loadModel(
             model: "assets/mobilenet_v1_1.0_224.tflite",
             labels: "assets/mobilenet_v1_1.0_224.txt",
+            isAsset: true,
+            numThreads: 1,
+            useGpuDelegate: false,
+
             // useGpuDelegate: true,
           );
       }
@@ -175,7 +180,7 @@ class _MyAppState extends State<MyApp> {
 
   Future recognizeImage(File image) async {
     int startTime = new DateTime.now().millisecondsSinceEpoch;
-    var recognitions = await Tflite.runModelOnImage(
+    var recognitions = await tflitePlugin.runModelOnImage(
       path: image.path,
       numResults: 6,
       threshold: 0.05,
@@ -183,7 +188,7 @@ class _MyAppState extends State<MyApp> {
       imageStd: 127.5,
     );
     setState(() {
-      _recognitions = recognitions;
+      _recognitions = recognitions ?? [];
     });
     int endTime = new DateTime.now().millisecondsSinceEpoch;
     print("Inference took ${endTime - startTime}ms");
@@ -192,15 +197,16 @@ class _MyAppState extends State<MyApp> {
   Future recognizeImageBinary(File image) async {
     int startTime = new DateTime.now().millisecondsSinceEpoch;
     var imageBytes = (await rootBundle.load(image.path)).buffer;
-    img.Image oriImage = img.decodeJpg(imageBytes.asUint8List());
-    img.Image resizedImage = img.copyResize(oriImage, height: 224, width: 224);
-    var recognitions = await Tflite.runModelOnBinary(
+    img.Image? oriImage = img.decodeJpg(imageBytes.asUint8List());
+    img.Image resizedImage =
+        img.copyResize(oriImage ?? img.Image(1, 1), height: 224, width: 224);
+    var recognitions = await tflitePlugin.runModelOnBinary(
       binary: imageToByteListFloat32(resizedImage, 224, 127.5, 127.5),
       numResults: 6,
       threshold: 0.05,
     );
     setState(() {
-      _recognitions = recognitions;
+      _recognitions = recognitions ?? [];
     });
     int endTime = new DateTime.now().millisecondsSinceEpoch;
     print("Inference took ${endTime - startTime}ms");
@@ -208,7 +214,7 @@ class _MyAppState extends State<MyApp> {
 
   Future yolov2Tiny(File image) async {
     int startTime = new DateTime.now().millisecondsSinceEpoch;
-    var recognitions = await Tflite.detectObjectOnImage(
+    var recognitions = await tflitePlugin.detectObjectOnImage(
       path: image.path,
       model: "YOLO",
       threshold: 0.3,
@@ -226,7 +232,7 @@ class _MyAppState extends State<MyApp> {
     //   numResultsPerClass: 1,
     // );
     setState(() {
-      _recognitions = recognitions;
+      _recognitions = recognitions ?? [];
     });
     int endTime = new DateTime.now().millisecondsSinceEpoch;
     print("Inference took ${endTime - startTime}ms");
@@ -234,7 +240,7 @@ class _MyAppState extends State<MyApp> {
 
   Future ssdMobileNet(File image) async {
     int startTime = new DateTime.now().millisecondsSinceEpoch;
-    var recognitions = await Tflite.detectObjectOnImage(
+    var recognitions = await tflitePlugin.detectObjectOnImage(
       path: image.path,
       numResultsPerClass: 1,
     );
@@ -246,7 +252,7 @@ class _MyAppState extends State<MyApp> {
     //   numResultsPerClass: 1,
     // );
     setState(() {
-      _recognitions = recognitions;
+      _recognitions = recognitions ?? [];
     });
     int endTime = new DateTime.now().millisecondsSinceEpoch;
     print("Inference took ${endTime - startTime}ms");
@@ -254,14 +260,14 @@ class _MyAppState extends State<MyApp> {
 
   Future segmentMobileNet(File image) async {
     int startTime = new DateTime.now().millisecondsSinceEpoch;
-    var recognitions = await Tflite.runSegmentationOnImage(
+    var recognitions = await tflitePlugin.runSegmentationOnImage(
       path: image.path,
       imageMean: 127.5,
       imageStd: 127.5,
     );
 
     setState(() {
-      _recognitions = recognitions;
+      _recognitions = recognitions ?? [];
     });
     int endTime = new DateTime.now().millisecondsSinceEpoch;
     print("Inference took ${endTime - startTime}");
@@ -269,7 +275,7 @@ class _MyAppState extends State<MyApp> {
 
   Future poseNet(File image) async {
     int startTime = new DateTime.now().millisecondsSinceEpoch;
-    var recognitions = await Tflite.runPoseNetOnImage(
+    var recognitions = await tflitePlugin.runPoseNetOnImage(
       path: image.path,
       numResults: 2,
     );
@@ -277,7 +283,7 @@ class _MyAppState extends State<MyApp> {
     print(recognitions);
 
     setState(() {
-      _recognitions = recognitions;
+      _recognitions = recognitions ?? [];
     });
     int endTime = new DateTime.now().millisecondsSinceEpoch;
     print("Inference took ${endTime - startTime}ms");
@@ -287,12 +293,12 @@ class _MyAppState extends State<MyApp> {
     setState(() {
       _busy = true;
       _model = model;
-      _recognitions = null;
+      _recognitions = [];
     });
     await loadModel();
 
     if (_image != null)
-      predictImage(_image);
+      predictImage(_image!);
     else
       setState(() {
         _busy = false;
@@ -304,9 +310,9 @@ class _MyAppState extends State<MyApp> {
     if (_imageHeight == null || _imageWidth == null) return [];
 
     double factorX = screen.width;
-    double factorY = _imageHeight / _imageWidth * screen.width;
+    double factorY = _imageHeight! / _imageWidth! * screen.width;
     Color blue = Color.fromRGBO(37, 213, 253, 1.0);
-    return _recognitions.map((re) {
+    return _recognitions!.map((re) {
       return Positioned(
         left: re["rect"]["x"] * factorX,
         top: re["rect"]["y"] * factorY,
@@ -338,10 +344,10 @@ class _MyAppState extends State<MyApp> {
     if (_imageHeight == null || _imageWidth == null) return [];
 
     double factorX = screen.width;
-    double factorY = _imageHeight / _imageWidth * screen.width;
+    double factorY = _imageHeight! / _imageWidth! * screen.width;
 
     var lists = <Widget>[];
-    _recognitions.forEach((re) {
+    _recognitions!.forEach((re) {
       var color = Color((Random().nextDouble() * 0xFFFFFF).toInt() << 0)
           .withOpacity(1.0);
       var list = re["keypoints"].values.map<Widget>((k) {
@@ -382,16 +388,19 @@ class _MyAppState extends State<MyApp> {
                 decoration: BoxDecoration(
                     image: DecorationImage(
                         alignment: Alignment.topCenter,
-                        image: MemoryImage(_recognitions),
+                        image: MemoryImage(_recognitions!
+                            .map((e) => e["mask"])
+                            .toList() as Uint8List),
                         fit: BoxFit.fill)),
-                child: Opacity(opacity: 0.3, child: Image.file(_image))),
+                child: Opacity(opacity: 0.3, child: Image.file(_image!))),
       ));
     } else {
       stackChildren.add(Positioned(
         top: 0.0,
         left: 0.0,
         width: size.width,
-        child: _image == null ? Text('No image selected.') : Image.file(_image),
+        child:
+            _image == null ? Text('No image selected.') : Image.file(_image!),
       ));
     }
 
@@ -399,7 +408,7 @@ class _MyAppState extends State<MyApp> {
       stackChildren.add(Center(
         child: Column(
           children: _recognitions != null
-              ? _recognitions.map((res) {
+              ? _recognitions!.map((res) {
                   return Text(
                     "${res["index"]} - ${res["label"]}: ${res["confidence"].toStringAsFixed(3)}",
                     style: TextStyle(

@@ -1,13 +1,12 @@
-import 'dart:typed_data';
-
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tflite/tflite.dart';
+import 'package:tflite/tflite_plugin.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  final tflitePlugin = TflitePlugin();
   const MethodChannel channel = MethodChannel(
-    'tflite',
+    'tflitePlugin',
   );
 
   final List<MethodCall> log = <MethodCall>[];
@@ -20,8 +19,8 @@ void main() {
     log.clear();
   });
   test('loadModel', () async {
-    await Tflite.loadModel(
-      model: 'assets/mobilenet_v1_1.0_224.tflite',
+    await tflitePlugin.loadModel(
+      model: 'assets/mobilenet_v1_1.0_224.tflitePlugin',
       labels: 'assets/mobilenet_v1_1.0_224.txt',
       numThreads: 2,
       isAsset: false,
@@ -33,7 +32,7 @@ void main() {
         isMethodCall(
           'loadModel',
           arguments: <String, dynamic>{
-            'model': 'assets/mobilenet_v1_1.0_224.tflite',
+            'model': 'assets/mobilenet_v1_1.0_224.tflitePlugin',
             'labels': 'assets/mobilenet_v1_1.0_224.txt',
             'numThreads': 2,
             'isAsset': false,
@@ -45,7 +44,7 @@ void main() {
   });
 
   test('runModelOnImage', () async {
-    await Tflite.runModelOnImage(
+    await tflitePlugin.runModelOnImage(
       path: '/image/path',
       imageMean: 127.5,
       imageStd: 0.5,
@@ -72,7 +71,7 @@ void main() {
   });
 
   test('runModelOnBinary', () async {
-    await Tflite.runModelOnBinary(
+    await tflitePlugin.runModelOnBinary(
       binary: Uint8List.fromList([
         0,
         1,
@@ -103,7 +102,7 @@ void main() {
   });
 
   test('runModelOnFrame', () async {
-    await Tflite.runModelOnFrame(
+    await tflitePlugin.runModelOnFrame(
       bytesList: [
         Uint8List.fromList([
           0,
@@ -158,7 +157,7 @@ void main() {
   });
 
   test('detectObjectOnImage', () async {
-    await Tflite.detectObjectOnImage(
+    await tflitePlugin.detectObjectOnImage(
       path: '/image/path',
       model: 'YOLO',
       imageMean: 127.5,
@@ -203,7 +202,7 @@ void main() {
   });
 
   test('detectObjectOnBinary', () async {
-    await Tflite.detectObjectOnBinary(
+    await tflitePlugin.detectObjectOnBinary(
       binary: Uint8List.fromList([
         0,
         1,
@@ -252,7 +251,7 @@ void main() {
   });
 
   test('detectObjectOnFrame', () async {
-    await Tflite.detectObjectOnFrame(
+    await tflitePlugin.detectObjectOnFrame(
       bytesList: [
         Uint8List.fromList([
           0,
@@ -325,7 +324,7 @@ void main() {
   });
 
   test('runPix2PixOnImage', () async {
-    await Tflite.runPix2PixOnImage(
+    await tflitePlugin.runPix2PixOnImage(
       path: '/image/path',
       imageMean: 127.5,
       imageStd: 0.5,
@@ -350,7 +349,7 @@ void main() {
   });
 
   test('runPix2PixOnBinary', () async {
-    await Tflite.runPix2PixOnBinary(
+    await tflitePlugin.runPix2PixOnBinary(
       binary: Uint8List.fromList([
         0,
         1,
@@ -379,7 +378,7 @@ void main() {
   });
 
   test('runPix2PixOnFrame', () async {
-    await Tflite.runPix2PixOnFrame(
+    await tflitePlugin.runPix2PixOnFrame(
       bytesList: [
         Uint8List.fromList([
           0,
@@ -432,7 +431,7 @@ void main() {
   });
 
   test('runSegmentationOnImage', () async {
-    await Tflite.runSegmentationOnImage(
+    await tflitePlugin.runSegmentationOnImage(
       path: '/image/path',
       imageMean: 127.5,
       imageStd: 0.5,
@@ -467,7 +466,7 @@ void main() {
   });
 
   test('runSegmentationOnBinary', () async {
-    await Tflite.runSegmentationOnBinary(
+    await tflitePlugin.runSegmentationOnBinary(
       binary: Uint8List.fromList([
         0,
         1,
@@ -506,7 +505,7 @@ void main() {
   });
 
   test('runSegmentationOnFrame', () async {
-    await Tflite.runSegmentationOnFrame(
+    await tflitePlugin.runSegmentationOnFrame(
       bytesList: [
         Uint8List.fromList([
           0,
